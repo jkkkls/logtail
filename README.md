@@ -12,27 +12,22 @@ $logtail -d /data/logtail/
 
 
 ```
+name: game1
 file: /data/games/slog/{date}/client.log
-# json, txt, txt需要指定分隔符和fields
-format: txt
+# 指定分隔符会按照fields拆分数据
 separator: ;
 fields:
     -
         name: time
         type: string
-        default: xx
     -
         name: channel
         type: int
-        default: 2
     -
         name: amount
         type: float
-        default: 1.1
 
 out:
-    console:
-        enabled: true
     kafak:
         enabled: true
         hosts: ["kafka01:8101"]
