@@ -1,5 +1,5 @@
 name: game1
-file: ./client.log
+file: ./test_data/{date}/client.log
 # 指定分隔符会按照fields拆分数据
 separator: ;
 fields:

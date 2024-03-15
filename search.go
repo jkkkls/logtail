@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/hpcloud/tail"
@@ -17,10 +16,10 @@ type LogConfig struct {
 	Offset        int64
 	WatchFileName string
 	Close         chan struct{}
-	run           int32
-	w             *sync.WaitGroup
+	wg            *sync.WaitGroup
 	sinkWriter    SinkWriter
 	parser        Parser
+	timer         *time.Timer
 }
 
 var logFiles = map[string]*LogConfig{}
@@ -28,13 +27,17 @@ var logFiles = map[string]*LogConfig{}
 func (l *LogConfig) reset(m map[string]int64) <-chan time.Time {
 	now := time.Now()
 	if strings.Contains(l.Config.File, "{date}") {
+		if l.timer != nil {
+			l.timer.Stop()
+		}
+
 		fileName := strings.ReplaceAll(l.Config.File, "{date}", now.Format("2006-01-02"))
 		l.WatchFileName = fileName
 		l.Offset = m[l.WatchFileName]
 		// 第二天0点0分0秒的定时器
 		nextDay := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.Local)
-		timer := time.NewTimer(nextDay.Sub(now))
-		return timer.C
+		l.timer = time.NewTimer(nextDay.Sub(now))
+		return l.timer.C
 	}
 
 	l.WatchFileName = l.Config.File
@@ -44,18 +47,16 @@ func (l *LogConfig) reset(m map[string]int64) <-chan time.Time {
 
 func (l *LogConfig) Run(m map[string]int64) {
 	c := l.reset(m)
-
-	if !atomic.CompareAndSwapInt32(&l.run, 0, 1) {
-		return
-	}
 	defer func() {
-		atomic.StoreInt32(&l.run, 0)
+		if l.timer != nil {
+			l.timer.Stop()
+		}
 	}()
 
-	textLogger.Info("tail file", "file", l.WatchFileName)
+	textLogger.Info("tail file", "file", l.WatchFileName, "offset", l.Offset)
 	if l.WatchFileName == "" {
 		<-l.Close
-		l.w.Done()
+		l.wg.Done()
 		return
 	}
 
@@ -76,19 +77,20 @@ func (l *LogConfig) Run(m map[string]int64) {
 				continue
 			}
 
+			// TODO: 失败重试
 			err = l.sinkWriter.Write(parsed)
 			if err != nil {
 				textLogger.Warn("write to sink error", "err", err)
 			}
 		case <-l.Close:
-			if l.w != nil {
-				l.w.Done()
+			if l.wg != nil {
+				l.wg.Done()
 			}
 			return
 		case <-c:
 			// 第二天
 			c = l.reset(map[string]int64{})
-
+			textLogger.Info("reset tail file", "file", l.WatchFileName)
 			t, err = tail.TailFile(l.WatchFileName, tail.Config{Follow: true, Location: &tail.SeekInfo{Offset: 0}})
 			if err != nil {
 				textLogger.Warn("tail file error: ", "err", err, "file", l.WatchFileName)
@@ -104,7 +106,7 @@ func rangeLogFiles(m map[string]int64) {
 	}
 }
 
-func searchDir(dirName string, w *sync.WaitGroup) error {
+func searchDir(dirName string, wg *sync.WaitGroup) error {
 	// 遍历目录
 	dir, err := os.ReadDir(dirName)
 	if err != nil {
@@ -115,7 +117,7 @@ func searchDir(dirName string, w *sync.WaitGroup) error {
 		fileName := file.Name()
 		configName := dirName + "/" + fileName
 		if file.IsDir() {
-			searchDir(configName, w)
+			searchDir(configName, wg)
 		}
 		if !strings.HasSuffix(file.Name(), ".yaml") {
 			continue
@@ -131,7 +133,7 @@ func searchDir(dirName string, w *sync.WaitGroup) error {
 		f := &LogConfig{
 			ConfigName: fileName,
 			Config:     config,
-			w:          w,
+			wg:         wg,
 			Close:      make(chan struct{}, 1),
 			sinkWriter: NewSinkWriter(config),
 			parser:     NewParser(config),

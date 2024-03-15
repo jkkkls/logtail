@@ -35,11 +35,13 @@ func initLog(console bool) error {
 }
 
 type LogTail struct {
-	w sync.WaitGroup
+	wg *sync.WaitGroup
 }
 
 func main() {
-	logtail := &LogTail{}
+	logtail := &LogTail{
+		wg: &sync.WaitGroup{},
+	}
 	if err := svc.Run(logtail, syscall.SIGINT, syscall.SIGTERM); err != nil {
 		log.Fatalf("logtail exit, returned: %s", err)
 	}
@@ -61,7 +63,7 @@ func (l *LogTail) Start() error {
 
 	m := loadOffset()
 	//
-	err := searchDir(*configDir, &l.w)
+	err := searchDir(*configDir, l.wg)
 	if err != nil {
 		return err
 	}
@@ -73,10 +75,10 @@ func (l *LogTail) Start() error {
 func (l *LogTail) Stop() error {
 	textLogger.Info("logtail close log files", "l", len(logFiles))
 	for _, f := range logFiles {
-		l.w.Add(1)
+		l.wg.Add(1)
 		f.Close <- struct{}{}
 	}
-	l.w.Wait()
+	l.wg.Wait()
 
 	m := map[string]int64{}
 	for _, f := range logFiles {
