@@ -4,14 +4,15 @@
 ### 执行方式
 
 ``` shell
-$logtail -d /data/logtail/
+# 指定配置目录，重新递归读取目录中的yaml配置文件。如果新增配置文件需要重启
+$ logtail -d /data/logtail/
 
 ```
 
-### 配置
+### yaml配置格式
 
 
-```
+``` yaml
 name: game1
 file: /data/games/slog/{date}/client.log
 # 指定分隔符会按照fields拆分数据
