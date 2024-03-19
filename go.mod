@@ -1,6 +1,6 @@
 module github.com/jkkkls/logtail
 
-go 1.22.1
+go 1.22
 
 require (
 	github.com/hpcloud/tail v1.0.0

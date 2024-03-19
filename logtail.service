@@ -1,0 +1,12 @@
+[Unit]
+Description=logtail service
+
+[Service]
+Type=forking
+ExecStart=/usr/local/logtail/run.sh start
+ExecStop=/usr/local/logtail/run.sh stop
+ExecReload=/usr/local/logtail/run.sh restart
+
+
+[Install]
+WantedBy=multi-user.target
