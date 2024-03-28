@@ -18,6 +18,7 @@ type Config struct {
 		Kafka struct {
 			Hosts    []string `yaml:"hosts"`
 			Topic    string   `yaml:"topic"`
+			Sasl     string   `yaml:"sasl"`
 			Username string   `yaml:"username"`
 			Password string   `yaml:"password"`
 		} `yaml:"kafka"`

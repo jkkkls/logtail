@@ -33,6 +33,7 @@ out:
         enabled: true
         hosts: ["kafka01:8101"]
         topic: game1:client
+        sasl: plain # plain or scram
         username:
         password:
 ```

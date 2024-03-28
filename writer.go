@@ -6,6 +6,8 @@ import (
 	"log"
 
 	"github.com/segmentio/kafka-go"
+	"github.com/segmentio/kafka-go/sasl"
+	"github.com/segmentio/kafka-go/sasl/plain"
 	"github.com/segmentio/kafka-go/sasl/scram"
 )
 
@@ -37,7 +39,12 @@ func NewSinkWriter(config *Config) SinkWriter {
 			Topic: config.Out.Kafka.Topic,
 		}
 		if config.Out.Kafka.Username != "" {
-			mechanism, _ := scram.Mechanism(scram.SHA256, config.Out.Kafka.Username, config.Out.Kafka.Password)
+			var mechanism sasl.Mechanism
+			if config.Out.Kafka.Sasl == "scram" {
+				mechanism, _ = scram.Mechanism(scram.SHA256, config.Out.Kafka.Username, config.Out.Kafka.Password)
+			} else {
+				mechanism = plain.Mechanism{Username: config.Out.Kafka.Username, Password: config.Out.Kafka.Password}
+			}
 			w.Transport = &kafka.Transport{
 				SASL: mechanism,
 				TLS:  &tls.Config{},
